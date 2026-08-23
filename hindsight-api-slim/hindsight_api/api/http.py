@@ -995,6 +995,52 @@ class BackgroundResponse(BaseModel):
     disposition: DispositionTraits | None = None
 
 
+class DeleteTunnelResponse(BaseModel):
+    """Response from deleting a tunnel."""
+
+    success: bool
+    deleted: bool = False
+
+
+# ── Closet models (ADR-145 Phase 3) ──────────────────────────
+
+
+class CreateClosetRequest(BaseModel):
+    """Request model for creating a closet (compressed summary)."""
+
+    room: str | None = Field(default=None, description="Room (topic) to compress. If not provided, compresses all.")
+    hall: str | None = Field(default=None, description="Hall (knowledge type) to compress. If not provided, compresses all.")
+    min_sources: int = Field(default=5, description="Minimum number of source memories to create a closet (default: 5)")
+    query: str | None = Field(default=None, description="Optional query to guide compression focus")
+
+
+class ClosetItem(BaseModel):
+    """A single closet."""
+
+    id: str
+    summary: str
+    source_count: int
+    room: str | None = None
+    hall: str | None = None
+    token_count: int = 0
+    created_at: str
+
+
+class CreateClosetResponse(BaseModel):
+    """Response from closet creation."""
+
+    success: bool
+    closets_created: int = 0
+    closets: list[ClosetItem] = FieldWithDefault(list, description="Created closets")
+
+
+class ListClosetsResponse(BaseModel):
+    """Response from listing closets."""
+
+    closets: list[ClosetItem] = FieldWithDefault(list, description="Closets")
+    total: int = 0
+
+
 class BankListItem(BaseModel):
     """Bank list item with profile summary."""
 
@@ -5935,4 +5981,89 @@ def _register_routes(app: FastAPI):
             import traceback
 
             logger.error(f"Error getting audit log stats: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=str(e))
+    async def api_delete_tunnel(
+        bank_id: str, tunnel_id: str, request_context: RequestContext = Depends(get_request_context)
+    ):
+        """Delete a tunnel."""
+        try:
+            result = await app.state.memory.delete_tunnel_async(
+                bank_id=bank_id,
+                tunnel_id=tunnel_id,
+                request_context=request_context,
+            )
+            return DeleteTunnelResponse(**result)
+        except (AuthenticationError, HTTPException):
+            raise
+        except Exception as e:
+            import traceback
+
+            logger.error(f"Error deleting tunnel {tunnel_id}: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ── Closet endpoints (ADR-145 Phase 3) ────────────────────────
+
+    @app.post(
+        "/v1/default/banks/{bank_id}/closets",
+        response_model=CreateClosetResponse,
+        summary="Create closets (compressed summaries)",
+        description="Compress memories by room+hall into closets. ADR-145 RCLL Phase 3.",
+        operation_id="create_closets",
+        tags=["Memory"],
+    )
+    async def api_create_closets(
+        bank_id: str, request: CreateClosetRequest, request_context: RequestContext = Depends(get_request_context)
+    ):
+        """Create compressed memory closets."""
+        try:
+            result = await app.state.memory.create_closets_async(
+                bank_id=bank_id,
+                room=request.room,
+                hall=request.hall,
+                min_sources=request.min_sources,
+                query=request.query,
+                request_context=request_context,
+            )
+            return CreateClosetResponse(**result)
+        except OperationValidationError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.reason)
+        except (AuthenticationError, HTTPException):
+            raise
+        except Exception as e:
+            import traceback
+
+            logger.error(f"Error creating closets for bank {bank_id}: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get(
+        "/v1/default/banks/{bank_id}/closets",
+        response_model=ListClosetsResponse,
+        summary="List closets",
+        description="List all compressed memory summaries for a bank.",
+        operation_id="list_closets",
+        tags=["Memory"],
+    )
+    async def api_list_closets(
+        bank_id: str,
+        room: str | None = Query(None, description="Filter by room"),
+        hall: str | None = Query(None, description="Filter by hall"),
+        request_context: RequestContext = Depends(get_request_context),
+    ):
+        """List closets for a bank."""
+        try:
+            result = await app.state.memory.list_closets_async(
+                bank_id=bank_id,
+                room=room,
+                hall=hall,
+                request_context=request_context,
+            )
+            return ListClosetsResponse(**result)
+        except OperationValidationError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.reason)
+        except (AuthenticationError, HTTPException):
+            raise
+        except Exception as e:
+            import traceback
+
+            logger.error(f"Error listing closets for bank {bank_id}: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=str(e))

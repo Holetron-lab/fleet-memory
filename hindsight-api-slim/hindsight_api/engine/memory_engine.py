@@ -89,6 +89,8 @@ _PROTECTED_TABLES = frozenset(
         "chunks",
         "async_operations",
         "file_storage",
+        "tunnels",
+        "closets",
     ]
 )
 
@@ -8164,3 +8166,236 @@ class MemoryEngine(MemoryEngineInterface):
             result_metadata={"mental_model_id": mental_model_id, "name": mental_model["name"]},
             dedupe_by_bank=False,
         )
+    # ==================== Closet Methods (ADR-145 Phase 3) ====================
+
+    async def create_closets_async(
+        self,
+        bank_id: str,
+        room: str | None = None,
+        hall: str | None = None,
+        min_sources: int = 5,
+        query: str | None = None,
+        request_context: "RequestContext | None" = None,
+    ) -> dict[str, Any]:
+        """
+        Create compressed closets from memories grouped by room+hall.
+
+        Flow:
+        1. Query memory_units grouped by (room, hall) with count >= min_sources
+        2. For each group, if no existing closet: use LLM to summarize
+        3. Generate embedding for the summary
+        4. Store as Closet with source_ids
+        """
+        from .retain import embedding_utils
+
+        await self._authenticate_tenant(request_context)
+        pool = await self._get_pool()
+
+        closets_created = []
+
+        async with acquire_with_retry(pool) as conn:
+            # Build WHERE clause for optional room/hall filters
+            where_parts = ["bank_id = $1"]
+            params: list[Any] = [bank_id]
+            idx = 2
+
+            if room:
+                where_parts.append(f"room = ${idx}")
+                params.append(room)
+                idx += 1
+            if hall:
+                where_parts.append(f"hall = ${idx}")
+                params.append(hall)
+                idx += 1
+
+            where_sql = " AND ".join(where_parts)
+
+            # Find groups with enough memories to compress
+            groups = await conn.fetch(
+                f"""
+                SELECT room, hall, array_agg(id) AS ids, count(*) AS cnt
+                FROM {fq_table("memory_units")}
+                WHERE {where_sql} AND room IS NOT NULL
+                GROUP BY room, hall
+                HAVING count(*) >= ${idx}
+                ORDER BY count(*) DESC
+                """,
+                *params,
+                min_sources,
+            )
+
+            for group in groups:
+                g_room = group["room"]
+                g_hall = group["hall"]
+                source_ids = [str(uid) for uid in group["ids"]]
+
+                # Check if closet already exists for this room+hall
+                existing = await conn.fetchval(
+                    f"""
+                    SELECT id FROM {fq_table("closets")}
+                    WHERE bank_id = $1 AND room IS NOT DISTINCT FROM $2 AND hall IS NOT DISTINCT FROM $3
+                    LIMIT 1
+                    """,
+                    bank_id,
+                    g_room,
+                    g_hall,
+                )
+                if existing:
+                    continue
+
+                # Collect source memory texts
+                mem_rows = await conn.fetch(
+                    f"""
+                    SELECT text FROM {fq_table("memory_units")}
+                    WHERE bank_id = $1 AND id = ANY($2::uuid[])
+                    ORDER BY event_date DESC
+                    LIMIT 100
+                    """,
+                    bank_id,
+                    group["ids"],
+                )
+                source_texts = [r["text"] for r in mem_rows]
+                combined = "\n".join(f"- {t}" for t in source_texts)
+
+                # Build LLM prompt for compression
+                focus = f" Focus especially on: {query}" if query else ""
+                messages = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a memory compression assistant. "
+                            "Summarize the following facts into a dense, information-rich paragraph. "
+                            "Preserve key details, names, dates, and decisions. "
+                            "Do NOT add opinions or speculation — only compress what is stated."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Room (topic): {g_room or 'general'}\n"
+                            f"Hall (type): {g_hall or 'mixed'}\n"
+                            f"Number of facts: {len(source_texts)}\n"
+                            f"{focus}\n\n"
+                            f"Facts to compress:\n{combined}"
+                        ),
+                    },
+                ]
+
+                try:
+                    summary = await self._llm_config.call(
+                        messages=messages,
+                        max_completion_tokens=1024,
+                        temperature=0.2,
+                        scope="closet_compress",
+                    )
+                except Exception as e:
+                    logger.error(f"[CLOSET] LLM error for room={g_room}, hall={g_hall}: {e}")
+                    continue
+
+                if not summary or not isinstance(summary, str):
+                    continue
+
+                # Count tokens
+                token_cnt = count_tokens(summary)
+
+                # Generate embedding
+                try:
+                    emb = await embedding_utils.generate_embeddings_batch(self.embeddings, [summary])
+                    embedding_str = str(emb[0]) if emb else None
+                except Exception as e:
+                    logger.error(f"[CLOSET] Embedding error for room={g_room}, hall={g_hall}: {e}")
+                    embedding_str = None
+
+                # Insert closet
+                row = await conn.fetchrow(
+                    f"""
+                    INSERT INTO {fq_table("closets")}
+                    (bank_id, summary, source_ids, room, hall, token_count, embedding)
+                    VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7)
+                    RETURNING id, created_at
+                    """,
+                    bank_id,
+                    summary,
+                    json.dumps(source_ids),
+                    g_room,
+                    g_hall,
+                    token_cnt,
+                    embedding_str,
+                )
+
+                closets_created.append({
+                    "id": str(row["id"]),
+                    "summary": summary,
+                    "source_count": len(source_ids),
+                    "room": g_room,
+                    "hall": g_hall,
+                    "token_count": token_cnt,
+                    "created_at": row["created_at"].isoformat(),
+                })
+
+                logger.info(
+                    f"[CLOSET] Created closet for bank={bank_id} room={g_room} hall={g_hall} "
+                    f"sources={len(source_ids)} tokens={token_cnt}"
+                )
+
+        return {
+            "success": True,
+            "closets_created": len(closets_created),
+            "closets": closets_created,
+        }
+
+    async def list_closets_async(
+        self,
+        bank_id: str,
+        room: str | None = None,
+        hall: str | None = None,
+        request_context: "RequestContext | None" = None,
+    ) -> dict[str, Any]:
+        """List closets for a bank, optionally filtered by room/hall."""
+        await self._authenticate_tenant(request_context)
+        pool = await self._get_pool()
+
+        async with acquire_with_retry(pool) as conn:
+            where_parts = ["bank_id = $1"]
+            params: list[Any] = [bank_id]
+            idx = 2
+
+            if room:
+                where_parts.append(f"room = ${idx}")
+                params.append(room)
+                idx += 1
+            if hall:
+                where_parts.append(f"hall = ${idx}")
+                params.append(hall)
+                idx += 1
+
+            where_sql = " AND ".join(where_parts)
+
+            rows = await conn.fetch(
+                f"""
+                SELECT id, summary, source_ids, room, hall, token_count, created_at
+                FROM {fq_table("closets")}
+                WHERE {where_sql}
+                ORDER BY created_at DESC
+                """,
+                *params,
+            )
+
+            closets = []
+            for row in rows:
+                raw_ids = row["source_ids"] if row["source_ids"] else []
+                src_ids = json.loads(raw_ids) if isinstance(raw_ids, str) else raw_ids
+                closets.append({
+                    "id": str(row["id"]),
+                    "summary": row["summary"],
+                    "source_count": len(src_ids) if isinstance(src_ids, list) else 0,
+                    "room": row["room"],
+                    "hall": row["hall"],
+                    "token_count": row["token_count"],
+                    "created_at": row["created_at"].isoformat(),
+                })
+
+            return {
+                "closets": closets,
+                "total": len(closets),
+            }

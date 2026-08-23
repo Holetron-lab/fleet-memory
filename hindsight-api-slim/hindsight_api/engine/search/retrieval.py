@@ -207,6 +207,9 @@ async def retrieve_semantic_bm25_combined(
             f"   AND (1 - (embedding <=> $1::vector)) >= 0.3"
             f"   {tags_clause}"
             f"   {groups_clause}"
+            f"   {room_clause}"
+            f"   {hall_clause}"
+            f"   {layer_clause}"
             f" ORDER BY embedding <=> $1::vector"
             f" LIMIT {hnsw_fetch})"
         )
@@ -247,6 +250,9 @@ async def retrieve_semantic_bm25_combined(
                 f"   {bm25_where_filter}"
                 f"   {tags_clause}"
                 f"   {groups_clause}"
+                f"   {room_clause}"
+                f"   {hall_clause}"
+                f"   {layer_clause}"
                 f" ORDER BY {bm25_order_by}"
                 f" LIMIT $3)"
             )
@@ -260,6 +266,9 @@ async def retrieve_semantic_bm25_combined(
     if tags:
         params.append(tags)
     params.extend(groups_params)
+    params.extend(room_params)
+    params.extend(hall_params)
+    params.extend(layer_params)
 
     rows = await conn.fetch(query, *params)
 
@@ -358,6 +367,9 @@ async def retrieve_temporal_combined(
     if tags:
         params.append(tags)
     params.extend(groups_params)
+    params.extend(room_params_list)
+    params.extend(hall_params_list)
+    params.extend(layer_params_list)
 
     # Two-phase entry point query:
     # Phase 1 (date_ranked): rank by date only — no embedding computation — for all units in
@@ -389,6 +401,9 @@ async def retrieve_temporal_combined(
               )
               {tags_clause}
               {groups_clause}
+              {room_clause}
+              {hall_clause}
+              {layer_clause}
         ),
         sim_ranked AS (
             SELECT mu.id, mu.text, mu.context, mu.event_date, mu.occurred_start, mu.occurred_end, mu.mentioned_at, mu.fact_type, mu.proof_count, mu.document_id, mu.chunk_id, mu.tags, mu.metadata, mu.room, mu.hall, mu.layer,

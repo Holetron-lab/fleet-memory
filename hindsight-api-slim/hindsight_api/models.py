@@ -296,6 +296,8 @@ class Bank(Base):
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("idx_banks_bank_id", "bank_id"),)
+
+
 class Tunnel(Base):
     """Cross-bank memory bridges — links between concepts in different banks (ADR-145 RCLL)."""
 

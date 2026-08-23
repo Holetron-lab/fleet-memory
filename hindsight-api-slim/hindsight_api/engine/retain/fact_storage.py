@@ -67,6 +67,9 @@ async def insert_facts_batch(
     tags_list = []
     observation_scopes_list = []
     text_signals_list = []
+    rooms_list = []
+    halls_list = []
+    layers_list = []
 
     for fact in facts:
         fact_texts.append(_sanitize_text(fact.fact_text))
@@ -120,7 +123,8 @@ async def insert_facts_batch(
             WITH input_data AS (
                 SELECT * FROM unnest(
                     $2::text[], $3::vector[], $4::timestamptz[], $5::timestamptz[], $6::timestamptz[], $7::timestamptz[],
-                    $8::text[], $9::text[], $10::jsonb[], $11::text[], $12::text[], $13::jsonb[], $14::jsonb[], $15::text[]
+                    $8::text[], $9::text[], $10::jsonb[], $11::text[], $12::text[], $13::jsonb[], $14::jsonb[], $15::text[],
+                    $16::text[], $17::text[], $18::text[]
                 ) AS t(text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
                        context, fact_type, metadata, chunk_id, document_id, tags_json,
                        observation_scopes_json, text_signals, room, hall, layer)
@@ -155,7 +159,8 @@ async def insert_facts_batch(
             WITH input_data AS (
                 SELECT * FROM unnest(
                     $2::text[], $3::vector[], $4::timestamptz[], $5::timestamptz[], $6::timestamptz[], $7::timestamptz[],
-                    $8::text[], $9::text[], $10::jsonb[], $11::text[], $12::text[], $13::jsonb[], $14::jsonb[], $15::text[]
+                    $8::text[], $9::text[], $10::jsonb[], $11::text[], $12::text[], $13::jsonb[], $14::jsonb[], $15::text[],
+                    $16::text[], $17::text[], $18::text[]
                 ) AS t(text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
                        context, fact_type, metadata, chunk_id, document_id, tags_json,
                        observation_scopes_json, text_signals, room, hall, layer)
@@ -197,6 +202,9 @@ async def insert_facts_batch(
         tags_list,
         observation_scopes_list,
         text_signals_list,
+        rooms_list,
+        halls_list,
+        layers_list,
     )
 
     unit_ids = [str(row["id"]) for row in results]

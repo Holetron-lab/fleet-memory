@@ -1734,11 +1734,13 @@ class MemoryEngine(MemoryEngineInterface):
 
                 # Ensure embedding column dimension matches the model's dimension
                 # This is done after migrations and after embeddings.initialize()
+                # Use migration URL (sync driver) when available, fallback to main URL
+                _sync_url = config.migration_database_url or self.db_url
                 for tenant in tenants:
                     schema = tenant.schema
                     if schema:
                         ensure_embedding_dimension(
-                            self.db_url,
+                            _sync_url,
                             self.embeddings.dimension,
                             schema=schema,
                             vector_extension=config.vector_extension,
@@ -1748,14 +1750,14 @@ class MemoryEngine(MemoryEngineInterface):
                 for tenant in tenants:
                     schema = tenant.schema
                     if schema:
-                        ensure_vector_extension(self.db_url, vector_extension=config.vector_extension, schema=schema)
+                        ensure_vector_extension(_sync_url, vector_extension=config.vector_extension, schema=schema)
 
                 # Ensure text search columns/indexes match the configured extension
                 for tenant in tenants:
                     schema = tenant.schema
                     if schema:
                         ensure_text_search_extension(
-                            self.db_url, text_search_extension=config.text_search_extension, schema=schema
+                            _sync_url, text_search_extension=config.text_search_extension, schema=schema
                         )
 
         logger.info(f"Connecting to PostgreSQL at {mask_network_location(self.db_url)}")

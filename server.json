@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.holetron-lab/rcll",
+  "title": "RCLL",
+  "description": "RCLL — team memory for agent fleets. Built on Hindsight (github.com/vectorize-io/hindsight, MIT). Self-hosted shared memory over MCP: rooms, hierarchical L0–L3 depth, pgvector.",
+  "version": "0.1.0",
+  "websiteUrl": "https://rcll.ai",
+  "repository": {
+    "url": "https://github.com/holetron-lab/rcll",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "rcll-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "RCLL_URL",
+          "description": "Base URL of the RCLL backend (self-hosted). Defaults to http://127.0.0.1:5100. The pre-rebrand name HINDSIGHT_URL is still read as a fallback.",
+          "isRequired": false,
+          "default": "http://127.0.0.1:5100"
+        },
+        {
+          "name": "RCLL_BANK",
+          "description": "Default memory bank ID for retain/recall. The pre-rebrand variable MEMPALACE_BANK is still read as a fallback; see mcp-server/README.md.",
+          "isRequired": false,
+          "default": "mempalace-main"
+        }
+      ]
+    }
+  ]
+}

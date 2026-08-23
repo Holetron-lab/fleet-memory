@@ -1,0 +1,30 @@
+{
+  "name": "rcll-mcp",
+  "version": "0.1.0",
+  "mcpName": "io.github.holetron-lab/rcll",
+  "description": "RCLL — self-hosted, hierarchical shared memory for a team of AI agents over MCP (rooms, L0–L3 depth, pgvector). Fork of vectorize-io/hindsight.",
+  "type": "module",
+  "main": "server.js",
+  "bin": {
+    "rcll-mcp": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "mcp",
+    "memory",
+    "rcll",
+    "hindsight",
+    "ai-agents",
+    "multi-agent",
+    "pgvector",
+    "long-term-memory",
+    "self-hosted",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}

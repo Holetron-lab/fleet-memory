@@ -15,8 +15,13 @@ node_modules/
 
 # Environment variables and local config
 .env
+*.env
 docker-compose.yml
 docker-compose.override.yml
+ecosystem.config.*
+
+# Python virtualenvs
+venv/
 
 # IDE
 .idea/
@@ -57,4 +62,11 @@ TASK.md
 # Changelog is now tracked in hindsight-docs/src/pages/changelog.md
 # CHANGELOG.md
 
-blog-post*
+blog-post*.github/workflows/
+
+# Session keys
+.sesskey
+*/.sesskey
+
+# Additional virtualenvs
+**/venv/

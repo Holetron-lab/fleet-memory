@@ -105,6 +105,9 @@ async def insert_facts_batch(
             except (ValueError, AttributeError):
                 pass
         text_signals_list.append(" ".join(signal_parts) if signal_parts else None)
+        rooms_list.append(getattr(fact, 'room', None))
+        halls_list.append(getattr(fact, 'hall', None))
+        layers_list.append(getattr(fact, 'layer', 'L2'))
 
     # Batch insert all facts
     # Note: tags are passed as JSON strings and converted back to varchar[] via jsonb_array_elements_text + array_agg
@@ -120,11 +123,11 @@ async def insert_facts_batch(
                     $8::text[], $9::text[], $10::jsonb[], $11::text[], $12::text[], $13::jsonb[], $14::jsonb[], $15::text[]
                 ) AS t(text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
                        context, fact_type, metadata, chunk_id, document_id, tags_json,
-                       observation_scopes_json, text_signals)
+                       observation_scopes_json, text_signals, room, hall, layer)
             )
             INSERT INTO {fq_table("memory_units")} (bank_id, text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
                                      context, fact_type, metadata, chunk_id, document_id, tags,
-                                     observation_scopes, text_signals, search_vector)
+                                     observation_scopes, text_signals, search_vector, room, hall, layer)
             SELECT
                 $1,
                 text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
@@ -138,7 +141,10 @@ async def insert_facts_batch(
                 tokenize(
                     COALESCE(text, '') || ' ' || COALESCE(context, '') || ' ' || COALESCE(text_signals, ''),
                     'llmlingua2'
-                )::bm25_catalog.bm25vector
+                )::bm25_catalog.bm25vector,
+                room,
+                hall,
+                COALESCE(layer, 'L2')
             FROM input_data
             RETURNING id
         """
@@ -152,11 +158,11 @@ async def insert_facts_batch(
                     $8::text[], $9::text[], $10::jsonb[], $11::text[], $12::text[], $13::jsonb[], $14::jsonb[], $15::text[]
                 ) AS t(text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
                        context, fact_type, metadata, chunk_id, document_id, tags_json,
-                       observation_scopes_json, text_signals)
+                       observation_scopes_json, text_signals, room, hall, layer)
             )
             INSERT INTO {fq_table("memory_units")} (bank_id, text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
                                      context, fact_type, metadata, chunk_id, document_id, tags,
-                                     observation_scopes, text_signals)
+                                     observation_scopes, text_signals, room, hall, layer)
             SELECT
                 $1,
                 text, embedding, event_date, occurred_start, occurred_end, mentioned_at,
@@ -166,7 +172,10 @@ async def insert_facts_batch(
                     '{{}}'::varchar[]
                 ),
                 observation_scopes_json,
-                text_signals
+                text_signals,
+                room,
+                hall,
+                COALESCE(layer, 'L2')
             FROM input_data
             RETURNING id
         """

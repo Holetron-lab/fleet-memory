@@ -171,6 +171,22 @@ class RecallRequest(BaseModel):
         description="Compound tag filter using boolean groups. Groups in the list are AND-ed. "
         "Each group is a leaf {tags, match} or compound {and: [...]}, {or: [...]}, {not: ...}.",
     )
+    room: list[str] | None = Field(
+        default=None,
+        description="Filter by room (topic). If specified, only memories in these rooms are searched. "
+        "Applied BEFORE semantic search, so the vector query runs over a narrowed candidate set.",
+    )
+    hall: list[str] | None = Field(
+        default=None,
+        description="Filter by hall (knowledge type). If specified, only these knowledge types are searched. "
+        "Values: fact, event, decision, preference, discovery, procedure, warning.",
+    )
+    max_layer: Literal["L0", "L1", "L2", "L3"] = Field(
+        default="L3",
+        description="Maximum memory layer to search (ADR-145). Recall searches L0 through max_layer. "
+        "L0=Identity only, L1=Identity+Critical, L2=+Session, L3=+Deep (all, default). "
+        "Results are ordered with L0 first (highest priority).",
+    )
 
     @field_validator("query")
     @classmethod
@@ -223,6 +239,9 @@ class RecallResult(BaseModel):
     metadata: dict[str, str] | None = None  # User-defined metadata
     chunk_id: str | None = None  # Chunk this fact was extracted from
     tags: list[str] | None = None  # Visibility scope tags
+    room: str | None = None  # Topic classification (ADR-145 RCLL)
+    hall: str | None = None  # Knowledge type classification (ADR-145 RCLL)
+    layer: str | None = None  # Memory layer (ADR-145: L0-L3)
     source_fact_ids: list[str] | None = (
         None  # IDs of source facts (observation type only, when source_facts is enabled)
     )
@@ -468,6 +487,24 @@ class MemoryItem(BaseModel):
         description="How to handle an existing document with the same document_id. "
         "'replace' (default) deletes old data and reprocesses from scratch. "
         "'append' concatenates new content to the existing document text and reprocesses.",
+    )
+    room: str | None = Field(
+        default=None,
+        description="Topic classification for hierarchical filtering (ADR-145 RCLL). "
+        "Examples: auth, pipeline, schema, tax, hr, legal, compliance, infrastructure, ui, api, deployment, monitoring. "
+        "Use 'custom:{name}' for custom topics. Auto-classified by LLM if not provided.",
+    )
+    hall: str | None = Field(
+        default=None,
+        description="Knowledge type classification (ADR-145 RCLL). "
+        "One of: fact, event, decision, preference, discovery, procedure, warning. "
+        "Auto-classified by LLM if not provided.",
+    )
+    layer: Literal["L0", "L1", "L2", "L3"] = Field(
+        default="L2",
+        description="Memory layer (ADR-145). L0=Identity (~50 tokens, always loaded), "
+        "L1=Critical Facts (~120 tokens, per-space), L2=Session Context (default), "
+        "L3=Deep Memory (full search).",
     )
 
     @field_validator("timestamp", mode="before")
@@ -2959,6 +2996,9 @@ def _register_routes(app: FastAPI):
                     tags=request.tags,
                     tags_match=request.tags_match,
                     tag_groups=request.tag_groups,
+                    room=request.room,
+                    hall=request.hall,
+                    max_layer=request.max_layer,
                 )
 
             # Convert core MemoryFact objects to API RecallResult objects (excluding internal metrics)
@@ -2976,6 +3016,9 @@ def _register_routes(app: FastAPI):
                     metadata=fact.metadata,
                     chunk_id=fact.chunk_id,
                     tags=fact.tags,
+                    room=getattr(fact, 'room', None),
+                    hall=getattr(fact, 'hall', None),
+                    layer=getattr(fact, 'layer', None),
                     source_fact_ids=fact.source_fact_ids,
                 )
 
@@ -5333,6 +5376,12 @@ def _register_routes(app: FastAPI):
                     content_dict["observation_scopes"] = item.observation_scopes
                 if item.update_mode is not None:
                     content_dict["update_mode"] = item.update_mode
+                if item.room:
+                    content_dict["room"] = item.room
+                if item.hall:
+                    content_dict["hall"] = item.hall
+                if item.layer and item.layer != "L2":
+                    content_dict["layer"] = item.layer
                 strategy_groups[effective].append(content_dict)
 
             if request.async_:

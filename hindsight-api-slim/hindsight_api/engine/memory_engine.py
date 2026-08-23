@@ -2427,6 +2427,9 @@ class MemoryEngine(MemoryEngineInterface):
         tags: list[str] | None = None,
         tags_match: TagsMatch = "any",
         tag_groups: list[TagGroup] | None = None,
+        room: list[str] | None = None,
+        hall: list[str] | None = None,
+        max_layer: str = "L3",
         _connection_budget: int | None = None,
         _quiet: bool = False,
     ) -> RecallResultModel:
@@ -2571,6 +2574,9 @@ class MemoryEngine(MemoryEngineInterface):
                             tags=tags,
                             tags_match=tags_match,
                             tag_groups=tag_groups,
+                            room=room,
+                            hall=hall,
+                            max_layer=max_layer,
                             connection_budget=_connection_budget,
                             quiet=_quiet,
                             include_source_facts=include_source_facts,
@@ -2699,6 +2705,9 @@ class MemoryEngine(MemoryEngineInterface):
         tags: list[str] | None = None,
         tags_match: TagsMatch = "any",
         tag_groups: list[TagGroup] | None = None,
+        room: list[str] | None = None,
+        hall: list[str] | None = None,
+        max_layer: str = "L3",
         connection_budget: int | None = None,
         quiet: bool = False,
         include_source_facts: bool = False,
@@ -2819,6 +2828,9 @@ class MemoryEngine(MemoryEngineInterface):
                         tags=tags,
                         tags_match=tags_match,
                         tag_groups=tag_groups,
+                        room=room,
+                        hall=hall,
+                        max_layer=max_layer,
                     )
                     parallel_duration = time.time() - parallel_start
             finally:
@@ -2865,6 +2877,17 @@ class MemoryEngine(MemoryEngineInterface):
             # If no temporal results from any fact type, set to None
             if not temporal_results:
                 temporal_results = None
+
+            # ADR-145: Python-side room/hall filtering for graph results
+            # (semantic/BM25/temporal are already SQL-filtered)
+            if room or hall:
+                def _room_hall_match(r):
+                    if room and getattr(r, 'room', None) not in room:
+                        return False
+                    if hall and getattr(r, 'hall', None) not in hall:
+                        return False
+                    return True
+                graph_results = [r for r in graph_results if _room_hall_match(r)]
 
             # Sort combined results by score (descending) so higher-scored results
             # get better ranks in the trace, regardless of fact type
@@ -3419,6 +3442,9 @@ class MemoryEngine(MemoryEngineInterface):
                         metadata=result_dict.get("metadata"),
                         chunk_id=result_dict.get("chunk_id"),
                         tags=result_dict.get("tags"),
+                        room=result_dict.get("room"),
+                        hall=result_dict.get("hall"),
+                        layer=result_dict.get("layer"),
                         source_fact_ids=source_fact_ids_by_obs.get(result_id) if include_source_facts else None,
                     )
                 )

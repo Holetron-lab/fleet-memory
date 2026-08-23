@@ -100,6 +100,9 @@ class MemoryUnit(Base):
     unit_metadata: Mapped[dict] = mapped_column(
         "metadata", JSONB, server_default=sql_text("'{}'::jsonb")
     )  # User-defined metadata (str->str)
+    room: Mapped[str | None] = mapped_column(Text)  # Topic classification (ADR-145 RCLL)
+    hall: Mapped[str | None] = mapped_column(Text)  # Knowledge type classification (ADR-145 RCLL)
+    layer: Mapped[str | None] = mapped_column(Text, server_default="L2")  # Memory layer (ADR-145 L0-L3)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
 

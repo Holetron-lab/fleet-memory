@@ -296,6 +296,39 @@ class Bank(Base):
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("idx_banks_bank_id", "bank_id"),)
+class Tunnel(Base):
+    """Cross-bank memory bridges — links between concepts in different banks (ADR-145 RCLL)."""
+
+    __tablename__ = "tunnels"
+
+    id: Mapped[PyUUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=sql_text("gen_random_uuid()")
+    )
+    source_bank: Mapped[str] = mapped_column(Text, nullable=False)
+    source_memory: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    target_bank: Mapped[str] = mapped_column(Text, nullable=False)
+    target_memory: Mapped[PyUUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    relation: Mapped[str] = mapped_column(Text, nullable=False)  # same_concept | depends_on | contradicts | extends
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.8")
+    created_by: Mapped[str | None] = mapped_column(Text)  # agent slug or user who created
+    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, server_default=sql_text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "relation IN ('same_concept', 'depends_on', 'contradicts', 'extends')",
+            name="tunnels_relation_check",
+        ),
+        CheckConstraint("confidence >= 0.0 AND confidence <= 1.0", name="tunnels_confidence_check"),
+        CheckConstraint("source_bank != target_bank OR source_memory != target_memory", name="tunnels_no_self_loop"),
+        Index("idx_tunnels_source", "source_bank", "source_memory"),
+        Index("idx_tunnels_target", "target_bank", "target_memory"),
+        Index("idx_tunnels_source_bank", "source_bank"),
+        Index("idx_tunnels_target_bank", "target_bank"),
+        Index("idx_tunnels_relation", "relation"),
+    )
+
+
 class Closet(Base):
     """Compressed memory summaries with pointers to source facts (ADR-145 RCLL)."""
 

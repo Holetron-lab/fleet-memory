@@ -8166,6 +8166,220 @@ class MemoryEngine(MemoryEngineInterface):
             result_metadata={"mental_model_id": mental_model_id, "name": mental_model["name"]},
             dedupe_by_bank=False,
         )
+
+    # ==================== Tunnel Methods (ADR-145 Phase 4) ====================
+
+    async def create_tunnel_async(
+        self,
+        source_bank: str,
+        source_memory: str,
+        target_bank: str,
+        target_memory: str,
+        relation: str,
+        confidence: float = 0.8,
+        created_by: str | None = None,
+        *,
+        request_context: "RequestContext",
+    ) -> dict[str, Any]:
+        """Create a cross-bank tunnel between two memories."""
+        await self._authenticate_tenant(request_context)
+        pool = await self._get_pool()
+
+        async with acquire_with_retry(pool) as conn:
+            # Validate source memory exists
+            source_row = await conn.fetchrow(
+                f"SELECT id FROM {fq_table('memory_units')} WHERE id = $1 AND bank_id = $2",
+                uuid.UUID(source_memory),
+                source_bank,
+            )
+            if not source_row:
+                raise ValueError(f"Source memory {source_memory} not found in bank {source_bank}")
+
+            # Validate target memory exists
+            target_row = await conn.fetchrow(
+                f"SELECT id FROM {fq_table('memory_units')} WHERE id = $1 AND bank_id = $2",
+                uuid.UUID(target_memory),
+                target_bank,
+            )
+            if not target_row:
+                raise ValueError(f"Target memory {target_memory} not found in bank {target_bank}")
+
+            # Validate relation type
+            valid_relations = ("same_concept", "depends_on", "contradicts", "extends")
+            if relation not in valid_relations:
+                raise ValueError(f"Invalid relation '{relation}'. Must be one of: {valid_relations}")
+
+            # Insert tunnel (ON CONFLICT returns existing)
+            row = await conn.fetchrow(
+                f"""
+                INSERT INTO {fq_table('tunnels')}
+                    (source_bank, source_memory, target_bank, target_memory, relation, confidence, created_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (source_bank, source_memory, target_bank, target_memory, relation) DO UPDATE
+                    SET confidence = EXCLUDED.confidence, created_by = EXCLUDED.created_by
+                RETURNING id, source_bank, source_memory, target_bank, target_memory, relation, confidence, created_by, created_at
+                """,
+                source_bank,
+                uuid.UUID(source_memory),
+                target_bank,
+                uuid.UUID(target_memory),
+                relation,
+                confidence,
+                created_by,
+            )
+
+            return {
+                "id": str(row["id"]),
+                "source_bank": row["source_bank"],
+                "source_memory": str(row["source_memory"]),
+                "target_bank": row["target_bank"],
+                "target_memory": str(row["target_memory"]),
+                "relation": row["relation"],
+                "confidence": row["confidence"],
+                "created_by": row["created_by"],
+                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            }
+
+    async def list_tunnels_async(
+        self,
+        bank_id: str,
+        relation: str | None = None,
+        target_bank: str | None = None,
+        *,
+        request_context: "RequestContext",
+    ) -> dict[str, Any]:
+        """List tunnels for a bank (as source OR target)."""
+        await self._authenticate_tenant(request_context)
+        pool = await self._get_pool()
+
+        async with acquire_with_retry(pool) as conn:
+            where_clauses = ["(source_bank = $1 OR target_bank = $1)"]
+            params: list[Any] = [bank_id]
+            idx = 2
+
+            if relation:
+                where_clauses.append(f"relation = ${idx}")
+                params.append(relation)
+                idx += 1
+
+            if target_bank:
+                where_clauses.append(f"(source_bank = ${idx} OR target_bank = ${idx})")
+                params.append(target_bank)
+                idx += 1
+
+            where_sql = " AND ".join(where_clauses)
+
+            rows = await conn.fetch(
+                f"""
+                SELECT id, source_bank, source_memory, target_bank, target_memory,
+                       relation, confidence, created_by, created_at
+                FROM {fq_table('tunnels')}
+                WHERE {where_sql}
+                ORDER BY created_at DESC
+                """,
+                *params,
+            )
+
+            tunnels = [
+                {
+                    "id": str(row["id"]),
+                    "source_bank": row["source_bank"],
+                    "source_memory": str(row["source_memory"]),
+                    "target_bank": row["target_bank"],
+                    "target_memory": str(row["target_memory"]),
+                    "relation": row["relation"],
+                    "confidence": row["confidence"],
+                    "created_by": row["created_by"],
+                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+                }
+                for row in rows
+            ]
+
+            return {"tunnels": tunnels, "total": len(tunnels)}
+
+    async def delete_tunnel_async(
+        self,
+        bank_id: str,
+        tunnel_id: str,
+        *,
+        request_context: "RequestContext",
+    ) -> dict[str, Any]:
+        """Delete a tunnel."""
+        await self._authenticate_tenant(request_context)
+        pool = await self._get_pool()
+
+        async with acquire_with_retry(pool) as conn:
+            result = await conn.execute(
+                f"""
+                DELETE FROM {fq_table('tunnels')}
+                WHERE id = $1 AND (source_bank = $2 OR target_bank = $2)
+                """,
+                uuid.UUID(tunnel_id),
+                bank_id,
+            )
+            deleted = result.split()[-1] != "0"  # "DELETE N"
+            return {"success": True, "deleted": deleted}
+
+    async def get_tunneled_memories_async(
+        self,
+        bank_id: str,
+        memory_ids: list[str],
+        *,
+        request_context: "RequestContext",
+    ) -> list[dict[str, Any]]:
+        """Get related memories from other banks via tunnels.
+
+        Used during recall to fetch cross-bank context.
+        For each memory_id in the recall results, finds tunnels and fetches the other side's memory text.
+        """
+        if not memory_ids:
+            return []
+
+        await self._authenticate_tenant(request_context)
+        pool = await self._get_pool()
+
+        uuid_ids = [uuid.UUID(mid) for mid in memory_ids]
+
+        async with acquire_with_retry(pool) as conn:
+            # Find tunnels where our bank+memories are either source or target
+            rows = await conn.fetch(
+                f"""
+                SELECT t.id AS tunnel_id, t.source_bank, t.source_memory, t.target_bank, t.target_memory,
+                       t.relation, t.confidence,
+                       mu.text AS linked_text, mu.bank_id AS linked_bank
+                FROM {fq_table('tunnels')} t
+                LEFT JOIN {fq_table('memory_units')} mu ON (
+                    CASE
+                        WHEN t.source_bank = $1 AND t.source_memory = ANY($2::uuid[])
+                            THEN mu.id = t.target_memory AND mu.bank_id = t.target_bank
+                        WHEN t.target_bank = $1 AND t.target_memory = ANY($2::uuid[])
+                            THEN mu.id = t.source_memory AND mu.bank_id = t.source_bank
+                        ELSE FALSE
+                    END
+                )
+                WHERE (t.source_bank = $1 AND t.source_memory = ANY($2::uuid[]))
+                   OR (t.target_bank = $1 AND t.target_memory = ANY($2::uuid[]))
+                """,
+                bank_id,
+                uuid_ids,
+            )
+
+            results = []
+            for row in rows:
+                results.append({
+                    "tunnel_id": str(row["tunnel_id"]),
+                    "relation": row["relation"],
+                    "confidence": row["confidence"],
+                    "linked_bank": row["linked_bank"],
+                    "linked_text": row["linked_text"],
+                    "source_bank": row["source_bank"],
+                    "source_memory": str(row["source_memory"]),
+                    "target_bank": row["target_bank"],
+                    "target_memory": str(row["target_memory"]),
+                })
+
+            return results
+
     # ==================== Closet Methods (ADR-145 Phase 3) ====================
 
     async def create_closets_async(

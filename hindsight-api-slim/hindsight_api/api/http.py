@@ -995,6 +995,48 @@ class BackgroundResponse(BaseModel):
     disposition: DispositionTraits | None = None
 
 
+class CreateTunnelRequest(BaseModel):
+    """Request to create a cross-bank memory bridge."""
+
+    source_bank: str = Field(description="Source bank ID")
+    source_memory: str = Field(description="Source memory unit UUID")
+    target_bank: str = Field(description="Target bank ID")
+    target_memory: str = Field(description="Target memory unit UUID")
+    relation: Literal["same_concept", "depends_on", "contradicts", "extends"] = Field(
+        description="Relationship type between the memories"
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="Confidence score (0.0-1.0)")
+    created_by: str | None = Field(default=None, description="Agent slug or user who creates the tunnel")
+
+
+class TunnelItem(BaseModel):
+    """A single tunnel."""
+
+    id: str
+    source_bank: str
+    source_memory: str
+    target_bank: str
+    target_memory: str
+    relation: str
+    confidence: float
+    created_by: str | None = None
+    created_at: str
+
+
+class CreateTunnelResponse(BaseModel):
+    """Response from tunnel creation."""
+
+    success: bool
+    tunnel: TunnelItem
+
+
+class ListTunnelsResponse(BaseModel):
+    """Response from listing tunnels."""
+
+    tunnels: list[TunnelItem] = []
+    total: int = 0
+
+
 class DeleteTunnelResponse(BaseModel):
     """Response from deleting a tunnel."""
 
@@ -5982,6 +6024,83 @@ def _register_routes(app: FastAPI):
 
             logger.error(f"Error getting audit log stats: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=str(e))
+
+    # ==================== Tunnel Endpoints (ADR-145 Phase 4) ====================
+
+    @app.post(
+        "/v1/default/banks/{bank_id}/tunnels",
+        response_model=CreateTunnelResponse,
+        summary="Create tunnel (cross-bank bridge)",
+        description="Create a cross-bank memory bridge between two memories in different banks. ADR-145 RCLL.",
+        operation_id="create_tunnel",
+        tags=["Memory"],
+    )
+    async def api_create_tunnel(
+        bank_id: str, request: CreateTunnelRequest, request_context: RequestContext = Depends(get_request_context)
+    ):
+        """Create a tunnel between two memories."""
+        try:
+            tunnel = await app.state.memory.create_tunnel_async(
+                source_bank=request.source_bank,
+                source_memory=request.source_memory,
+                target_bank=request.target_bank,
+                target_memory=request.target_memory,
+                relation=request.relation,
+                confidence=request.confidence,
+                created_by=request.created_by,
+                request_context=request_context,
+            )
+            return CreateTunnelResponse(success=True, tunnel=TunnelItem(**tunnel))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except (AuthenticationError, HTTPException):
+            raise
+        except Exception as e:
+            import traceback
+
+            logger.error(f"Error creating tunnel for bank {bank_id}: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get(
+        "/v1/default/banks/{bank_id}/tunnels",
+        response_model=ListTunnelsResponse,
+        summary="List tunnels",
+        description="List cross-bank memory bridges for a bank (both as source and target).",
+        operation_id="list_tunnels",
+        tags=["Memory"],
+    )
+    async def api_list_tunnels(
+        bank_id: str,
+        relation: str | None = Query(default=None, description="Filter by relation type"),
+        target_bank: str | None = Query(default=None, description="Filter by target bank"),
+        request_context: RequestContext = Depends(get_request_context),
+    ):
+        """List tunnels for a bank."""
+        try:
+            result = await app.state.memory.list_tunnels_async(
+                bank_id=bank_id,
+                relation=relation,
+                target_bank=target_bank,
+                request_context=request_context,
+            )
+            tunnels = [TunnelItem(**t) for t in result["tunnels"]]
+            return ListTunnelsResponse(tunnels=tunnels, total=result["total"])
+        except (AuthenticationError, HTTPException):
+            raise
+        except Exception as e:
+            import traceback
+
+            logger.error(f"Error listing tunnels for bank {bank_id}: {traceback.format_exc()}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete(
+        "/v1/default/banks/{bank_id}/tunnels/{tunnel_id}",
+        response_model=DeleteTunnelResponse,
+        summary="Delete tunnel",
+        description="Delete a cross-bank memory bridge.",
+        operation_id="delete_tunnel",
+        tags=["Memory"],
+    )
     async def api_delete_tunnel(
         bank_id: str, tunnel_id: str, request_context: RequestContext = Depends(get_request_context)
     ):

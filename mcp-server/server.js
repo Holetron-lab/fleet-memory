@@ -53,12 +53,20 @@ function envWithFallback(current, legacy) {
 
 const RCLL_URL = envWithFallback(...LEGACY_ENV[0]) || 'http://127.0.0.1:5100';
 const RCLL_BASE = `${RCLL_URL}/v1/default/banks`;
-// The default bank literal deliberately stays 'mempalace-main': that is the value
-// hindsight-mempalace-mcp@1.0.0 shipped with, so anyone who never set the env var is
-// already living in that bank. Renaming the default would silently drop them into an
-// empty bank on upgrade and read as "the update erased my memory".
-// Drop this at the 60-day mark, together with the legacy image alias.
-const DEFAULT_BANK = envWithFallback(...LEGACY_ENV[1]) || 'mempalace-main';
+// The default bank is 'rcll-main'. The pre-rebrand package
+// hindsight-mempalace-mcp@1.0.0 defaulted to 'mempalace-main', so an install that
+// never set the env var and switches packages would land in a different, empty bank.
+// That reads as "the update erased my memory", so we say it out loud instead of
+// guessing: the legacy env var is still honoured, and defaulting is announced.
+const LEGACY_DEFAULT_BANK = 'mempalace-main';
+const DEFAULT_BANK = envWithFallback(...LEGACY_ENV[1]) || 'rcll-main';
+if (!process.env.RCLL_BANK && !process.env.MEMPALACE_BANK) {
+  console.error(
+    `rcll-mcp: RCLL_BANK is unset, using '${DEFAULT_BANK}'. ` +
+      `Coming from hindsight-mempalace-mcp? Your memory is in '${LEGACY_DEFAULT_BANK}' — ` +
+      `set RCLL_BANK=${LEGACY_DEFAULT_BANK} to keep reading it.`
+  );
+}
 
 // --- RCLL HTTP client ---
 

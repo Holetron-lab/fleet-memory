@@ -48,7 +48,17 @@ Add to `~/.claude/mcp.json`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RCLL_URL` | `http://127.0.0.1:5100` | RCLL backend base URL |
-| `RCLL_BANK` | `mempalace-main` | Default memory bank ID. The default keeps the pre-rebrand value on purpose, so an install that never set it stays on the same bank after upgrading. Set it explicitly. |
+| `RCLL_BANK` | `rcll-main` | Default memory bank ID. Set it explicitly. |
+
+### Migrating from `hindsight-mempalace-mcp`
+
+That package defaulted to bank `mempalace-main`. `rcll-mcp` defaults to `rcll-main`,
+so an install that never set the variable would open a different, empty bank — which
+reads as "the update erased my memory". It does not: the old bank is still there.
+
+Set `RCLL_BANK=mempalace-main` to keep reading it, or move the contents into a new
+bank first. When `RCLL_BANK` and `MEMPALACE_BANK` are both unset, the server prints
+which bank it defaulted to on stderr rather than picking one silently.
 
 ### Deprecated (still read, with a notice on stderr)
 

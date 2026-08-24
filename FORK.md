@@ -50,7 +50,7 @@ point, not ours. **Our real patch is 32 files.**
 
 ### How the split was verified
 
-The series was not hand-sorted. `/root/rcll-split.py` decomposes the
+The series was not hand-sorted. [`scripts/rcll-split.py`](scripts/rcll-split.py) decomposes the
 base→snapshot diff to **line granularity** — hunks are too coarse, because the
 two largest are single appended blocks containing more than one feature — then
 classifies every edit and materialises each stage by content.

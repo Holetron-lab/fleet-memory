@@ -27,9 +27,9 @@
         },
         {
           "name": "RCLL_BANK",
-          "description": "Default memory bank ID for retain/recall. The pre-rebrand variable MEMPALACE_BANK is still read as a fallback; see mcp-server/README.md.",
+          "description": "Default memory bank ID for retain/recall. The pre-rebrand variable MEMPALACE_BANK is still read as a fallback. Migrating from hindsight-mempalace-mcp? Set this to mempalace-main to keep reading your existing bank; see mcp-server/README.md.",
           "isRequired": false,
-          "default": "mempalace-main"
+          "default": "rcll-main"
         }
       ]
     }

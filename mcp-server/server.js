@@ -11,10 +11,10 @@
  *   memory_compress — create closet summaries
  *   memory_bridge   — cross-bank tunnels
  *
- * Connects to the RCLL backend (default: http://127.0.0.1:5100)
+ * Connects to the fleet-memory backend (default: http://127.0.0.1:5100)
  *
  * Usage:
- *   RCLL_URL=http://localhost:5100 node server.js
+ *   FLEET_URL=http://localhost:5100 node server.js
  *
  * Claude Code config (~/.claude/mcp.json):
  *   {
@@ -22,7 +22,7 @@
  *       "rcll": {
  *         "command": "node",
  *         "args": ["/path/to/mcp-server/server.js"],
- *         "env": { "RCLL_URL": "http://localhost:5100" }
+ *         "env": { "FLEET_URL": "http://localhost:5100" }
  *       }
  *     }
  *   }
@@ -34,44 +34,44 @@ import { z } from 'zod';
 
 // --- Config ---
 
-// RCLL_* are the current names. The pre-rebrand names are still honored as a
+// FLEET_* are the current names. The pre-rebrand names are still honored as a
 // fallback so an existing install keeps working after `npm update` — each one
 // hit prints a deprecation notice on stderr (stdout is the MCP transport).
 const LEGACY_ENV = [
-  ['RCLL_URL', 'HINDSIGHT_URL'],
-  ['RCLL_BANK', 'MEMPALACE_BANK'],
+  ['FLEET_URL', 'HINDSIGHT_URL'],
+  ['FLEET_BANK', 'MEMPALACE_BANK'],
 ];
 
 function envWithFallback(current, legacy) {
   if (process.env[current]) return process.env[current];
   if (process.env[legacy]) {
-    console.error(`rcll-mcp: ${legacy} is deprecated — rename it to ${current}.`);
+    console.error(`fleet-memory-mcp: ${legacy} is deprecated — rename it to ${current}.`);
     return process.env[legacy];
   }
   return undefined;
 }
 
-const RCLL_URL = envWithFallback(...LEGACY_ENV[0]) || 'http://127.0.0.1:5100';
-const RCLL_BASE = `${RCLL_URL}/v1/default/banks`;
-// The default bank is 'rcll-main'. The pre-rebrand package
+const FLEET_URL = envWithFallback(...LEGACY_ENV[0]) || 'http://127.0.0.1:5100';
+const FLEET_BASE = `${FLEET_URL}/v1/default/banks`;
+// The default bank is 'fleet-main'. The pre-rebrand package
 // hindsight-mempalace-mcp@1.0.0 defaulted to 'mempalace-main', so an install that
 // never set the env var and switches packages would land in a different, empty bank.
 // That reads as "the update erased my memory", so we say it out loud instead of
 // guessing: the legacy env var is still honoured, and defaulting is announced.
 const LEGACY_DEFAULT_BANK = 'mempalace-main';
-const DEFAULT_BANK = envWithFallback(...LEGACY_ENV[1]) || 'rcll-main';
-if (!process.env.RCLL_BANK && !process.env.MEMPALACE_BANK) {
+const DEFAULT_BANK = envWithFallback(...LEGACY_ENV[1]) || 'fleet-main';
+if (!process.env.FLEET_BANK && !process.env.MEMPALACE_BANK) {
   console.error(
-    `rcll-mcp: RCLL_BANK is unset, using '${DEFAULT_BANK}'. ` +
+    `fleet-memory-mcp: FLEET_BANK is unset, using '${DEFAULT_BANK}'. ` +
       `Coming from hindsight-mempalace-mcp? Your memory is in '${LEGACY_DEFAULT_BANK}' — ` +
-      `set RCLL_BANK=${LEGACY_DEFAULT_BANK} to keep reading it.`
+      `set FLEET_BANK=${LEGACY_DEFAULT_BANK} to keep reading it.`
   );
 }
 
-// --- RCLL HTTP client ---
+// --- fleet-memory HTTP client ---
 
 async function hindsightRequest(method, path, body = null) {
-  const url = `${RCLL_BASE}${path}`;
+  const url = `${FLEET_BASE}${path}`;
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -326,8 +326,8 @@ server.resource(
       uri: 'rcll://config',
       mimeType: 'application/json',
       text: JSON.stringify({
-        rcll_url: RCLL_URL,
-        hindsight_url: RCLL_URL,  // legacy alias, drop after 60d
+        fleet_url: FLEET_URL,
+        hindsight_url: FLEET_URL,  // legacy alias, drop after 60d
         default_bank: DEFAULT_BANK,
         rooms: ['auth', 'pipeline', 'schema', 'infrastructure', 'ui', 'api', 'deployment', 'monitoring', 'agent', 'general'],
         halls: ['fact', 'event', 'decision', 'preference', 'discovery', 'procedure', 'warning'],
@@ -347,13 +347,7 @@ server.resource(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  if (!process.env.RCLL_BANK && !process.env.MEMPALACE_BANK) {
-    console.error(
-      `rcll-mcp: no bank configured — falling back to the pre-rebrand default '${DEFAULT_BANK}'. ` +
-      'Set RCLL_BANK explicitly; this fallback goes away in a future major.'
-    );
-  }
-  console.error(`rcll-mcp running (backend: ${RCLL_URL}, bank: ${DEFAULT_BANK})`);
+  console.error(`fleet-memory-mcp running (backend: ${FLEET_URL}, bank: ${DEFAULT_BANK})`);
 }
 
 main().catch(err => {

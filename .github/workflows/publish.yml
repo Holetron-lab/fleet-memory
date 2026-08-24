@@ -1,10 +1,10 @@
 name: Publish to npm
 
-# Publishes rcll-mcp to npm via OIDC Trusted Publishing.
+# Publishes fleet-memory-mcp to npm via OIDC Trusted Publishing.
 # No NPM_TOKEN needed — npm verifies this workflow's identity through the
-# Trusted Publisher trust configured on npmjs.com (holetron-lab/rcll).
+# Trusted Publisher trust configured on npmjs.com (holetron-lab/fleet-memory).
 # NOTE: that trust entry is per package AND per repo. It has to be re-created on
-# npmjs.com for rcll-mcp + holetron-lab/rcll before the first release fires,
+# npmjs.com for fleet-memory-mcp + holetron-lab/fleet-memory before the first release fires,
 # otherwise the publish step fails with an OIDC mismatch.
 # Fires when a GitHub Release is published; the release tag is the source of truth
 # for the version already set in mcp-server/package.json.

@@ -4,7 +4,7 @@
 
 > RCLL — team memory for agent fleets. Built on Hindsight (github.com/vectorize-io/hindsight, MIT).
 
-RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hindsight) (MIT). It keeps Hindsight's storage engine and adds **rooms** — shared, isolated memory across a team of agents — plus a hierarchical depth model (L0–L3). The room/hall/layer taxonomy is prior art in the hierarchical-memory space; the implementation here is our own.
+RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hindsight) (MIT). It keeps Hindsight's storage engine and adds **rooms** — topic scoping over one shared store, which is selectivity rather than isolation — plus a hierarchical depth model (L0–L3). The room/hall/layer taxonomy is prior art in the hierarchical-memory space; the implementation here is our own.
 
 RCLL is `recall` with the vowels dropped — the one operation every agent in the fleet performs before it does anything else. The tool is literally called `memory_recall`; the product is named after the call.
 
@@ -12,7 +12,7 @@ RCLL is `recall` with the vowels dropped — the one operation every agent in th
 
 ### Status
 
-The source is public and MIT. **There is no packaged release yet:** `rcll-mcp` is not published on npm and no container image is pushed. Running RCLL today means building from this tree, which the quick start below does. Don't quote an install command as working until [rcll.ai](https://rcll.ai/) shows one.
+The source is public and MIT. **There is no packaged release yet:** `fleet-memory-mcp` is not published on npm and no container image is pushed. Running RCLL today means building from this tree, which the quick start below does. Don't quote an install command as working until [rcll.ai](https://rcll.ai/) shows one.
 
 | | |
 |---|---|
@@ -66,7 +66,7 @@ This is a list of **our additions relative to our branch point** ([`d054b884`](h
 
 | Added here | What it is |
 |---|---|
-| **Rooms** | Per-agent and shared scoping on every write and every read |
+| **Rooms** | Topic scoping on every write and every read — selectivity, not isolation |
 | **Halls** | Knowledge typing within a room (fact, event, decision, procedure, warning) |
 | **Layers L0–L3** | Durability tiers; L0 always recalled, L3 deep-search only |
 | **Classification** | Keyword-based, sub-millisecond, **no LLM call** — the taxonomy costs zero tokens |
@@ -96,7 +96,7 @@ Latency on CPU with no GPU: ~0.29 s for search, ~3.0 s including the cross-encod
 ## Quick start
 
 ```bash
-git clone https://github.com/holetron-lab/rcll.git
+git clone https://github.com/holetron-lab/fleet-memory.git
 cd rcll
 cp .env.example .env
 # edit .env with your config
@@ -158,7 +158,7 @@ costs about 1 KB instead of 43 KB. Recall spends no model call; it does spend co
 ```bash
 cd mcp-server
 npm install
-RCLL_URL=http://localhost:5100 node server.js
+FLEET_URL=http://localhost:5100 node server.js
 ```
 
 ### Claude Code config
@@ -172,8 +172,8 @@ Add to `~/.claude/mcp.json`:
       "command": "node",
       "args": ["/path/to/mcp-server/server.js"],
       "env": {
-        "RCLL_URL": "http://localhost:5100",
-        "RCLL_BANK": "my-agent-bank"
+        "FLEET_URL": "http://localhost:5100",
+        "FLEET_BANK": "my-agent-bank"
       }
     }
   }

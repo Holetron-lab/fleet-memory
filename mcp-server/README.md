@@ -1,10 +1,10 @@
-# RCLL MCP Server
+# RCLL MCP Server (`fleet-memory-mcp`)
 
-Standalone [MCP](https://modelcontextprotocol.io) server that exposes **RCLL** memory tools to any MCP-compatible client (Claude Code, OpenClaw, etc). RCLL is self-hosted, hierarchical **shared** memory for a *team* of AI agents — rooms for per-agent vs shared recall, L0–L3 depth, pgvector under the hood.
+Standalone [MCP](https://modelcontextprotocol.io) server that exposes **RCLL** memory tools to any MCP-compatible client (Claude Code, OpenClaw, etc). RCLL is self-hosted, hierarchical **shared** memory for a *team* of AI agents — topic-scoped rooms, L0–L3 depth, pgvector under the hood. The published artifact is named `fleet-memory`; RCLL is the product name.
 
 > RCLL — team memory for agent fleets. Built on Hindsight (github.com/vectorize-io/hindsight, MIT).
 
-RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hindsight) (MIT). It keeps Hindsight's storage engine and adds rooms — shared, isolated memory for a team of agents — plus a hierarchical depth model (L0–L3). The room/hall/layer taxonomy is prior art in the hierarchical-memory space; the implementation here is our own.
+RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hindsight) (MIT). It keeps Hindsight's storage engine and adds rooms — topic scoping over one shared store, which is selectivity rather than isolation — plus a hierarchical depth model (L0–L3). The room/hall/layer taxonomy is prior art in the hierarchical-memory space; the implementation here is our own.
 
 ## Tools
 
@@ -21,7 +21,7 @@ RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hin
 ```bash
 cd mcp-server
 npm install
-RCLL_URL=http://localhost:5100 node server.js
+FLEET_URL=http://localhost:5100 node server.js
 ```
 
 ## Claude Code
@@ -33,10 +33,10 @@ Add to `~/.claude/mcp.json`:
   "mcpServers": {
     "rcll": {
       "command": "npx",
-      "args": ["-y", "rcll-mcp"],
+      "args": ["-y", "fleet-memory-mcp"],
       "env": {
-        "RCLL_URL": "http://localhost:5100",
-        "RCLL_BANK": "my-agent-bank"
+        "FLEET_URL": "http://localhost:5100",
+        "FLEET_BANK": "my-agent-bank"
       }
     }
   }
@@ -47,28 +47,28 @@ Add to `~/.claude/mcp.json`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RCLL_URL` | `http://127.0.0.1:5100` | RCLL backend base URL |
-| `RCLL_BANK` | `rcll-main` | Default memory bank ID. Set it explicitly. |
+| `FLEET_URL` | `http://127.0.0.1:5100` | fleet-memory backend base URL |
+| `FLEET_BANK` | `fleet-main` | Default memory bank ID. Set it explicitly. |
 
 ### Migrating from `hindsight-mempalace-mcp`
 
-That package defaulted to bank `mempalace-main`. `rcll-mcp` defaults to `rcll-main`,
+That package defaulted to bank `mempalace-main`. `fleet-memory-mcp` defaults to `fleet-main`,
 so an install that never set the variable would open a different, empty bank — which
 reads as "the update erased my memory". It does not: the old bank is still there.
 
-Set `RCLL_BANK=mempalace-main` to keep reading it, or move the contents into a new
-bank first. When `RCLL_BANK` and `MEMPALACE_BANK` are both unset, the server prints
+Set `FLEET_BANK=mempalace-main` to keep reading it, or move the contents into a new
+bank first. When `FLEET_BANK` and `MEMPALACE_BANK` are both unset, the server prints
 which bank it defaulted to on stderr rather than picking one silently.
 
 ### Deprecated (still read, with a notice on stderr)
 
 Installs created before the rebrand keep working — these are used only when the
-`RCLL_*` equivalent is unset, and they will be dropped in a future major.
+`FLEET_*` equivalent is unset, and they will be dropped in a future major.
 
 | Legacy variable | Replaced by |
 |-----------------|-------------|
-| `HINDSIGHT_URL` | `RCLL_URL` |
-| `MEMPALACE_BANK` | `RCLL_BANK` |
+| `HINDSIGHT_URL` | `FLEET_URL` |
+| `MEMPALACE_BANK` | `FLEET_BANK` |
 
 ## Memory Taxonomy
 

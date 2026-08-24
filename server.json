@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.holetron-lab/rcll",
+  "name": "io.github.holetron-lab/fleet-memory",
   "title": "RCLL",
   "description": "RCLL — team memory for agent fleets. Built on Hindsight (github.com/vectorize-io/hindsight, MIT). Self-hosted shared memory over MCP: rooms, hierarchical L0–L3 depth, pgvector.",
   "version": "0.1.0",
   "websiteUrl": "https://rcll.ai",
   "repository": {
-    "url": "https://github.com/holetron-lab/rcll",
+    "url": "https://github.com/holetron-lab/fleet-memory",
     "source": "github"
   },
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "rcll-mcp",
+      "identifier": "fleet-memory-mcp",
       "version": "0.1.0",
       "runtimeHint": "npx",
       "transport": {
@@ -20,16 +20,16 @@
       },
       "environmentVariables": [
         {
-          "name": "RCLL_URL",
-          "description": "Base URL of the RCLL backend (self-hosted). Defaults to http://127.0.0.1:5100. The pre-rebrand name HINDSIGHT_URL is still read as a fallback.",
+          "name": "FLEET_URL",
+          "description": "Base URL of the fleet-memory backend (self-hosted). Defaults to http://127.0.0.1:5100. The pre-rebrand name HINDSIGHT_URL is still read as a fallback.",
           "isRequired": false,
           "default": "http://127.0.0.1:5100"
         },
         {
-          "name": "RCLL_BANK",
+          "name": "FLEET_BANK",
           "description": "Default memory bank ID for retain/recall. The pre-rebrand variable MEMPALACE_BANK is still read as a fallback. Migrating from hindsight-mempalace-mcp? Set this to mempalace-main to keep reading your existing bank; see mcp-server/README.md.",
           "isRequired": false,
-          "default": "rcll-main"
+          "default": "fleet-main"
         }
       ]
     }

@@ -109,7 +109,7 @@ stays `false` there. Rehearse on a copy of the schema, never on the master.
 ## Remotes
 
 ```
-origin    https://github.com/holetron-lab/rcll.git
+origin    https://github.com/holetron-lab/fleet-memory.git
 upstream  https://github.com/vectorize-io/hindsight.git   (push URL deliberately
                                                            poisoned — nothing on
                                                            this box can push to

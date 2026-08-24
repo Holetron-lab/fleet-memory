@@ -98,7 +98,10 @@ async function hindsightRequest(method, path, body = null) {
 
 const server = new McpServer({
   name: 'rcll',
-  version: '1.0.0',
+  // Keep in step with package.json and server.json — the MCP registry validates
+  // the package it resolves against this manifest, and a version that disagrees
+  // with the tarball is a review failure, not a cosmetic drift.
+  version: '0.1.0',
 });
 
 // Tool 1: memory_retain
@@ -177,7 +180,7 @@ server.tool(
 
     const result = await hindsightRequest('POST', `/${bankId}/memories/recall`, body);
 
-    const memories = (result.results || []).map(r => ({
+    const all = (result.results || []).map(r => ({
       id: r.id || r.uuid || null,
       text: r.text,
       type: r.type,
@@ -187,6 +190,13 @@ server.tool(
       hall: r.hall || null,
     }));
 
+    // The backend treats `limit` as a retrieval hint, not a result cap: it returns
+    // everything that fits its own token budget (~110 facts, ~40 KB of JSON) no
+    // matter what we ask for. Unenforced here, the tool's own description would be
+    // false and every recall would spend ~10k tokens of the caller's context.
+    const effectiveLimit = body.limit;
+    const memories = all.slice(0, effectiveLimit);
+
     return {
       content: [{
         type: 'text',
@@ -194,6 +204,9 @@ server.tool(
           success: true,
           bank_id: bankId,
           count: memories.length,
+          ...(all.length > memories.length
+            ? { returned_of_available: `${memories.length} of ${all.length}` }
+            : {}),
           memories,
         }, null, 2),
       }],

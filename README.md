@@ -125,7 +125,16 @@ Dimension is detected automatically. ⚠️ Switching models changes the vector 
 
 ## MCP Server
 
-The `mcp-server/` directory contains a standalone [MCP](https://modelcontextprotocol.io) server. Any MCP-compatible client (Claude Code, OpenClaw, Cursor, etc.) connects and gets structured long-term memory.
+The `mcp-server/` directory contains a standalone [MCP](https://modelcontextprotocol.io) server over stdio.
+
+**What is actually verified**, as of 2026-08-24, against a live backend: protocol version
+`2025-06-18`; `initialize`, `tools/list` and `tools/call` all round-trip; `memory_recall`
+returns real results. That is a protocol-level check run directly over stdio — not a
+client-by-client compatibility matrix.
+
+Any client that speaks MCP over stdio should therefore work, but we have not sat in front
+of each one. Listed below is the config we run ourselves (Claude Code) and no others. If
+you get it working with a different client, a PR to this section is the useful kind.
 
 ### Tools
 
@@ -138,6 +147,11 @@ The `mcp-server/` directory contains a standalone [MCP](https://modelcontextprot
 | `memory_bridge` | Cross-bank tunnels between related memories |
 
 `memory_recall` is the only one of the five that never calls a model. `memory_reflect` is an agentic loop with repeated LLM calls — if you expose this server to anything untrusted, expose `memory_recall` alone.
+
+One thing worth knowing before you budget context: the backend treats `limit` on recall as
+a retrieval hint, not a result cap — it returns everything inside its own token budget,
+around 110 facts. The MCP layer enforces your `limit` on the way out, so a `limit: 2` recall
+costs about 1 KB instead of 43 KB. Recall spends no model call; it does spend context.
 
 ### Setup
 

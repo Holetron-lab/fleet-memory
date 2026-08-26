@@ -4,6 +4,15 @@
 
 > RCLL — team memory for agent fleets. Built on Hindsight (github.com/vectorize-io/hindsight, MIT).
 
+> [!IMPORTANT]
+> **You are looking at a read-only mirror.** The canonical repository is
+> [`godcrm.ai/git/holetron-lab/fleet-memory`](https://godcrm.ai/git/holetron-lab/fleet-memory) —
+> self-hosted, public, clonable anonymously with no account anywhere in the chain. Everything
+> here is pushed out from there, so **a merge performed on GitHub is overwritten by the next
+> sync**, usually within the hour. Issues and stars belong here and are read. A pull request is
+> welcome here as well — it gets merged on the canonical side and arrives back here on the next
+> sync.
+
 RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hindsight) (MIT). It keeps Hindsight's storage engine and adds **rooms** — topic scoping over one shared store, which is selectivity rather than isolation — plus a hierarchical depth model (L0–L3). The room/hall/layer taxonomy is prior art in the hierarchical-memory space; the implementation here is our own.
 
 RCLL is `recall` with the vowels dropped — the one operation every agent in the fleet performs before it does anything else. The tool is literally called `memory_recall`; the product is named after the call.

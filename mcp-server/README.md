@@ -4,6 +4,10 @@ Standalone [MCP](https://modelcontextprotocol.io) server that exposes **RCLL** m
 
 > RCLL — team memory for agent fleets. Built on Hindsight (github.com/vectorize-io/hindsight, MIT).
 
+Canonical repository: <https://godcrm.ai/git/holetron-lab/fleet-memory> — self-hosted, clonable
+anonymously. <https://github.com/holetron-lab/fleet-memory> is a read-only mirror of it, and is
+where issues and stars go.
+
 RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hindsight) (MIT). It keeps Hindsight's storage engine and adds rooms — topic scoping over one shared store, which is selectivity rather than isolation — plus a hierarchical depth model (L0–L3). The room/hall/layer taxonomy is prior art in the hierarchical-memory space; the implementation here is our own.
 
 ## Tools
@@ -17,6 +21,16 @@ RCLL is a fork of [`vectorize-io/hindsight`](https://github.com/vectorize-io/hin
 | `memory_bridge` | Cross-bank tunnels between related memories |
 
 ## Quick Start
+
+```bash
+npx fleet-memory-mcp
+```
+
+`FLEET_URL` points at your own RCLL backend (default `http://127.0.0.1:5100`); this package is the
+MCP client half and does not start a store for you. Standing one up is [the quickstart on
+rcll.ai](https://rcll.ai/docs/quickstart/).
+
+From a clone instead:
 
 ```bash
 cd mcp-server

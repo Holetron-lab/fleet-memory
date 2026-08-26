@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "mcpName": "io.github.holetron-lab/fleet-memory",
   "description": "RCLL — self-hosted, hierarchical shared memory for a team of AI agents over MCP (rooms, L0-L3 depth, pgvector). Fork of vectorize-io/hindsight.",
+  "homepage": "https://rcll.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holetron-lab/fleet-memory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/holetron-lab/fleet-memory/issues"
+  },
   "type": "module",
   "main": "server.js",
   "bin": {
@@ -27,5 +35,13 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1"
-  }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "server.js",
+    "README.md",
+    "LICENSE"
+  ]
 }

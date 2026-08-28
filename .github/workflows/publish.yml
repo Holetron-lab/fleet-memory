@@ -27,9 +27,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Node 22, not 20: the upgrade step below pulls npm@latest, and npm 12
+      # declares engines node ^22.22.2 || ^24.15.0 || >=26. On Node 20 that
+      # install fails the engine check and the publish step never runs — after
+      # the GitHub Release is already public. The published package itself
+      # still supports Node >=18 (mcp-server/package.json engines); this pins
+      # only the build runner.
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
       # Trusted Publishing + provenance require npm >= 11.5.1

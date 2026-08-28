@@ -6,15 +6,15 @@
   "homepage": "https://rcll.ai",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/holetron-lab/fleet-memory.git"
+    "url": "git+https://github.com/Holetron-lab/fleet-memory.git"
   },
   "bugs": {
-    "url": "https://github.com/holetron-lab/fleet-memory/issues"
+    "url": "https://github.com/Holetron-lab/fleet-memory/issues"
   },
   "type": "module",
   "main": "server.js",
   "bin": {
-    "fleet-memory-mcp": "./server.js"
+    "fleet-memory-mcp": "server.js"
   },
   "scripts": {
     "start": "node server.js"

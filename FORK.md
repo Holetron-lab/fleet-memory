@@ -122,3 +122,24 @@ upstream  https://github.com/vectorize-io/hindsight.git   (push URL deliberately
 and this repository is one decision away from being made public with an already
 published `server.json` — a rewritten history is a one-way door. The series
 lives on its own branch; repointing `main` is the owner's call.
+
+## Dependency updates: why there is no dependabot
+
+`.github/dependabot.yml` was removed on 2026-08-28. It was not failing — it was
+running in a loop that could never land.
+
+GitHub is a **push mirror** of the Forgejo canon, not a peer. The mirror sync
+force-matches refs, so a branch dependabot opens on GitHub is deleted within the
+hour and its pull request closes itself. Two runs proved it (`bump
+actions/checkout 4 → 7` and `bump actions/setup-node 4 → 7`, both opened
+2026-08-24, both auto-closed). A public repository whose only pull requests are
+self-closed bot PRs reads as abandoned, which is the opposite of what the bot is
+for.
+
+The bot's one useful output was taken by hand: `.github/workflows/publish.yml`
+now pins `actions/checkout@v7` and `actions/setup-node@v7`, and that upgrade
+shipped in the 0.1.0 release.
+
+Action versions are therefore bumped on the canon, by hand, when the workflow is
+touched. If GitHub ever becomes the canon rather than a mirror, restore the file
+— the loop closes only because pushes are one-way.
